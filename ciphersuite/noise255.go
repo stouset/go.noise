@@ -42,9 +42,11 @@ func (n *noise255) CCLen() int            { return n.keyLen + n.ivLen }
 func (n *noise255) CVLen() int            { return n.cvLen }
 func (n *noise255) MACLen() int           { return n.macLen }
 
-func (n *noise255) Keypair() (pair Keypair) {
-	pair.Public = make([]byte, n.pubKeyLen)
-	pair.Private = make([]byte, n.privKeyLen)
+func (n *noise255) NewKeypair() (pair *keypair) {
+	pair = &keypair{
+		Public:  make([]byte, n.pubKeyLen),
+		Private: make([]byte, n.privKeyLen),
+	}
 
 	pubPtr := (*C.uchar)(unsafe.Pointer(&pair.Public[0]))
 	privPtr := (*C.uchar)(unsafe.Pointer(&pair.Private[0]))
@@ -56,7 +58,7 @@ func (n *noise255) Keypair() (pair Keypair) {
 	return
 }
 
-func (n *noise255) DH(privKey PrivateKey, pubKey PublicKey) (dhKey SharedKey) {
+func (n *noise255) DH(privKey privateKey, pubKey publicKey) (dhKey sharedKey) {
 	dhKey = make([]byte, n.dhLen)
 
 	dhPtr := (*C.uchar)(unsafe.Pointer(&dhKey[0]))

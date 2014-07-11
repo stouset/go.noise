@@ -1,12 +1,12 @@
 package ciphersuite
 
-type PublicKey []byte
-type PrivateKey []byte
-type SharedKey []byte
+type publicKey []byte
+type privateKey []byte
+type sharedKey []byte
 
-type Keypair struct {
-	Public  PublicKey
-	Private PrivateKey
+type keypair struct {
+	Public  publicKey
+	Private privateKey
 }
 
 type ciphersuite interface {
@@ -16,8 +16,8 @@ type ciphersuite interface {
 	CVLen() int
 	MACLen() int
 
-	Keypair() Keypair
+	NewKeypair() *keypair
 
-	DH(privKey PrivateKey, pubKey PublicKey) SharedKey
+	DH(privKey privateKey, pubKey publicKey) sharedKey
 	Encrypt(cc []byte, authtext []byte, plaintext []byte) []byte
 }
