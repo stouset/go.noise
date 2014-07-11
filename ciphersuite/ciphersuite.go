@@ -1,23 +1,23 @@
 package ciphersuite
 
-type publicKey []byte
-type privateKey []byte
-type sharedKey []byte
+type PublicKey []byte
+type PrivateKey []byte
+type SymmetricKey []byte
 
-type keypair struct {
-	Public  publicKey
-	Private privateKey
+type Keypair struct {
+	Public  PublicKey
+	Private PrivateKey
 }
 
-type ciphersuite interface {
+type Ciphersuite interface {
 	Name() [24]byte
 	DHLen() int
 	CCLen() int
 	CVLen() int
 	MACLen() int
 
-	NewKeypair() *keypair
+	NewKeypair() *Keypair
 
-	DH(privKey privateKey, pubKey publicKey) sharedKey
+	DH(privKey PrivateKey, pubKey PublicKey) SymmetricKey
 	Encrypt(cc []byte, authtext []byte, plaintext []byte) []byte
 }

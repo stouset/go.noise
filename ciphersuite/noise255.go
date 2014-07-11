@@ -10,7 +10,7 @@ import "unsafe"
 
 import "encoding/binary"
 
-var Noise255 noise255 = noise255{
+var Noise255 *noise255 = &noise255{
 	name:   [24]byte{'N', 'o', 'i', 's', 'e', '2', '5', '5'},
 	dhLen:  32,
 	keyLen: 32,
@@ -42,8 +42,8 @@ func (n *noise255) CCLen() int            { return n.keyLen + n.ivLen }
 func (n *noise255) CVLen() int            { return n.cvLen }
 func (n *noise255) MACLen() int           { return n.macLen }
 
-func (n *noise255) NewKeypair() (pair *keypair) {
-	pair = &keypair{
+func (n *noise255) NewKeypair() (pair *Keypair) {
+	pair = &Keypair{
 		Public:  make([]byte, n.pubKeyLen),
 		Private: make([]byte, n.privKeyLen),
 	}
@@ -58,7 +58,7 @@ func (n *noise255) NewKeypair() (pair *keypair) {
 	return
 }
 
-func (n *noise255) DH(privKey privateKey, pubKey publicKey) (dhKey sharedKey) {
+func (n *noise255) DH(privKey PrivateKey, pubKey PublicKey) (dhKey SymmetricKey) {
 	dhKey = make([]byte, n.dhLen)
 
 	dhPtr := (*C.uchar)(unsafe.Pointer(&dhKey[0]))
@@ -70,9 +70,13 @@ func (n *noise255) DH(privKey privateKey, pubKey publicKey) (dhKey sharedKey) {
 	return
 }
 
-func (n *noise255) Encrypt(cc []byte, authtext []byte, plaintext []byte) (ciphertext []byte) {
+func (n *noise255) Encrypt(
+	cc []byte,
+	authtext []byte,
+	plaintext []byte,
+) (ciphertext []byte) {
 	key := cc[:n.keyLen]
-	iv := cc[n.keyLen : n.keyLen+n.ivLen]
+	iv := cc[n.keyLen:]
 
 	keystream := n.encrypt(key, iv, make([]byte, 128), 0)
 	ciphertext = n.encrypt(key, iv, plaintext, 2)
@@ -87,8 +91,12 @@ func (n *noise255) Encrypt(cc []byte, authtext []byte, plaintext []byte) (cipher
 	return
 }
 
-func (n *noise255) encrypt(key []byte, iv []byte, plaintext []byte,
-	counter int) (ciphertext []byte) {
+func (n *noise255) encrypt(
+	key []byte,
+	iv []byte,
+	plaintext []byte,
+	counter int,
+) (ciphertext []byte) {
 	// nothing to do if the plaintext is empty; this will cause the
 	// ciphertext to be empty, too
 	if len(plaintext) == 0 {
@@ -109,7 +117,11 @@ func (n *noise255) encrypt(key []byte, iv []byte, plaintext []byte,
 	return
 }
 
-func (n *noise255) mac(key []byte, authtext []byte, ciphertext []byte) (mac []byte) {
+func (n *noise255) mac(
+	key []byte,
+	authtext []byte,
+	ciphertext []byte,
+) (mac []byte) {
 	authtextOffset := 0
 	ciphertextOffset := pad16len(authtext)
 	authLenOffset := pad16len(ciphertext) + ciphertextOffset
