@@ -76,7 +76,9 @@ func (n *noise255) Encrypt(
 	cc []byte,
 	authtext []byte,
 	plaintext []byte,
-) (ciphertext []byte) {
+) (
+	ciphertext []byte,
+) {
 	key := cc[:n.keyLen]
 	iv := cc[n.keyLen:]
 
@@ -97,7 +99,10 @@ func (n *noise255) Decrypt(
 	cc []byte,
 	authtext []byte,
 	ciphertext []byte,
-) (plaintext []byte, err error) {
+) (
+	plaintext []byte,
+	err error,
+) {
 	key := cc[:n.keyLen]
 	iv := cc[n.keyLen:]
 
@@ -123,7 +128,9 @@ func (n *noise255) encrypt(
 	iv []byte,
 	plaintext []byte,
 	counter int,
-) (ciphertext []byte) {
+) (
+	ciphertext []byte,
+) {
 	// nothing to do if the plaintext is empty; this will cause the
 	// ciphertext to be empty, too
 	if len(plaintext) == 0 {
@@ -148,7 +155,9 @@ func (n *noise255) mac(
 	key []byte,
 	authtext []byte,
 	ciphertext []byte,
-) (mac []byte) {
+) (
+	mac []byte,
+) {
 	authtextOffset := 0
 	ciphertextOffset := pad16len(authtext)
 	authLenOffset := pad16len(ciphertext) + ciphertextOffset

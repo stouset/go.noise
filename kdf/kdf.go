@@ -7,7 +7,14 @@ import "unsafe"
 
 const hashLen = 64
 
-func Derive(secret []byte, extra []byte, info []byte, outLen int) (out []byte) {
+func Derive(
+	secret []byte,
+	extra []byte,
+	info []byte,
+	outLen int,
+) (
+	out []byte,
+) {
 	var state C.struct_crypto_auth_hmacsha512_state
 
 	sLen := C.size_t(len(secret))

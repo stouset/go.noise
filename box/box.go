@@ -17,7 +17,9 @@ func deriveBoxKey(
 	dhKey ciphersuite.SymmetricKey,
 	cv *[]byte,
 	kdfNum *int8,
-) (cc []byte) {
+) (
+	cc []byte,
+) {
 	name := suite.Name()
 	info := append(name[:], byte(*kdfNum))
 
