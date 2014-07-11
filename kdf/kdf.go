@@ -5,7 +5,6 @@ package kdf
 import "C"
 import "unsafe"
 
-const cvLen = 48
 const hashLen = 64
 
 func Derive(secret []byte, extra []byte, info []byte, outLen int) (out []byte) {

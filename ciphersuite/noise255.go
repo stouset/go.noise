@@ -7,28 +7,31 @@ package ciphersuite
 // #include <sodium/randombytes.h>
 import "C"
 import "unsafe"
+
 import "encoding/binary"
 
 var Noise255 noise255 = noise255{
-	name:      [24]byte{'N', 'o', 'i', 's', 'e', '2', '5', '5'},
-	dhLen:     32,
-	keyLen:    32,
-	ivLen:     8,
-	macKeyLen: 32,
-	macLen:    16,
+	name:   [24]byte{'N', 'o', 'i', 's', 'e', '2', '5', '5'},
+	dhLen:  32,
+	keyLen: 32,
+	ivLen:  8,
+	cvLen:  48,
+	macLen: 16,
 
+	macKeyLen:  32,
 	pubKeyLen:  int(C.crypto_scalarmult_curve25519_scalarbytes()),
 	privKeyLen: int(C.crypto_scalarmult_curve25519_bytes()),
 }
 
 type noise255 struct {
-	name      [24]byte
-	dhLen     int
-	keyLen    int
-	ivLen     int
-	macKeyLen int
-	macLen    int
+	name   [24]byte
+	dhLen  int
+	keyLen int
+	ivLen  int
+	cvLen  int
+	macLen int
 
+	macKeyLen  int
 	pubKeyLen  int
 	privKeyLen int
 }
@@ -36,6 +39,7 @@ type noise255 struct {
 func (n *noise255) Name() (name [24]byte) { return n.name }
 func (n *noise255) DHLen() int            { return n.dhLen }
 func (n *noise255) CCLen() int            { return n.keyLen + n.ivLen }
+func (n *noise255) CVLen() int            { return n.cvLen }
 func (n *noise255) MACLen() int           { return n.macLen }
 
 func (n *noise255) Keypair() (pair Keypair) {

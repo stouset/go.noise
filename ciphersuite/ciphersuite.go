@@ -13,6 +13,7 @@ type ciphersuite interface {
 	Name() [24]byte
 	DHLen() int
 	CCLen() int
+	CVLen() int
 	MACLen() int
 
 	Keypair() Keypair
