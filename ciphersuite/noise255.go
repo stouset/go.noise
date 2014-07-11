@@ -8,7 +8,9 @@ package ciphersuite
 import "C"
 import "unsafe"
 
+import "bytes"
 import "encoding/binary"
+import "errors"
 
 var Noise255 *noise255 = &noise255{
 	name:   [24]byte{'N', 'o', 'i', 's', 'e', '2', '5', '5'},
@@ -87,6 +89,31 @@ func (n *noise255) Encrypt(
 	mac := n.mac(macKey, authtext, ciphertext)
 
 	ciphertext = append(ciphertext, mac...)
+
+	return
+}
+
+func (n *noise255) Decrypt(
+	cc []byte,
+	authtext []byte,
+	ciphertext []byte,
+) (plaintext []byte, err error) {
+	key := cc[:n.keyLen]
+	iv := cc[n.keyLen:]
+
+	keystream := n.encrypt(key, iv, make([]byte, 128), 0)
+	macKey := keystream[:n.macKeyLen]
+
+	mac := ciphertext[len(ciphertext)-n.macLen:]
+	ciphertext = ciphertext[:len(ciphertext)-n.macLen]
+
+	if !bytes.Equal(mac, n.mac(macKey, authtext, ciphertext)) {
+		return nil, errors.New("noise255: ciphertext MAC indicates tampering")
+	}
+
+	plaintext = n.encrypt(key, iv, ciphertext, 2)
+
+	copy(cc, keystream[64:64+n.CCLen()])
 
 	return
 }

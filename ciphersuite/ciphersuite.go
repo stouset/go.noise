@@ -20,4 +20,5 @@ type Ciphersuite interface {
 
 	DH(privKey PrivateKey, pubKey PublicKey) SymmetricKey
 	Encrypt(cc []byte, authtext []byte, plaintext []byte) []byte
+	Decrypt(cc []byte, authtext []byte, ciphertext []byte) ([]byte, error)
 }
