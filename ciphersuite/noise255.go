@@ -1,6 +1,7 @@
 package ciphersuite
 
 // #cgo pkg-config: libsodium
+// #include <sodium/core.h>
 // #include <sodium/crypto_onetimeauth_poly1305.h>
 // #include <sodium/crypto_scalarmult_curve25519.h>
 // #include <sodium/crypto_stream_chacha20.h>
@@ -11,6 +12,9 @@ import "unsafe"
 import "bytes"
 import "encoding/binary"
 import "errors"
+
+// TODO: check return value
+var sodiumInitialized = int(C.sodium_init())
 
 var Noise255 *noise255 = &noise255{
 	name:   [24]byte{'N', 'o', 'i', 's', 'e', '2', '5', '5'},
