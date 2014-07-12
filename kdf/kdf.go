@@ -31,10 +31,13 @@ func Derive(
 
 	iterations := byte((outLen + hashLen - 1) / hashLen)
 	c := byte(0)
+
 	cOffset := len(info)
+	tOffset := cOffset + 1
 
 	for ; c < iterations; c++ {
-		m[cOffset] = c
+		copy(m[cOffset:], []byte{c})
+		copy(m[tOffset:], t[:32])
 
 		C.crypto_auth_hmacsha512_init(&state, sPtr, sLen)
 		C.crypto_auth_hmacsha512_update(&state, mPtr, mLen)
