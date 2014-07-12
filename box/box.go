@@ -55,7 +55,7 @@ func shutBox(
 	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum+1)
 
 	header := shutBoxHeader(suite, cc1, selfEphemeralKey.Public, selfKey.Public)
-	body := shutBoxBody(suite, cc2, header, data, padLen)
+	body := shutBoxBody(suite, cc2, selfEphemeralKey.Public, header, data, padLen)
 
 	box = make(
 		[]byte,
@@ -83,6 +83,7 @@ func shutBoxHeader(
 func shutBoxBody(
 	suite ciphersuite.Ciphersuite,
 	cc []byte,
+	selfEphemeralPublicKey ciphersuite.PublicKey,
 	header []byte,
 	data []byte,
 	padLen uint32,
@@ -103,7 +104,11 @@ func shutBoxBody(
 	copy(plaintext[len(data):], random)
 	binary.BigEndian.PutUint32(plaintext[len(data)+len(random):], padLen)
 
-	return suite.Encrypt(cc, header, plaintext)
+	return suite.Encrypt(
+		cc,
+		append(selfEphemeralPublicKey, header...),
+		plaintext,
+	)
 }
 
 func openBox(
@@ -135,7 +140,7 @@ func openBox(
 	dh2 := suite.DH(selfEphemeralKey.Private, *peerKey)
 	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum+1)
 
-	data, err = openBoxBody(suite, cc2, body, header)
+	data, err = openBoxBody(suite, cc2, peerEphemeralKey, header, body)
 
 	if err != nil {
 		return nil, err
@@ -159,13 +164,18 @@ func openBoxHeader(
 func openBoxBody(
 	suite ciphersuite.Ciphersuite,
 	cc []byte,
-	body []byte,
+	peerEphemeralKey *ciphersuite.PublicKey,
 	header []byte,
+	body []byte,
 ) (
 	data []byte,
 	err error,
 ) {
-	plaintext, err := suite.Decrypt(cc, header, body)
+	plaintext, err := suite.Decrypt(
+		cc,
+		append(*peerEphemeralKey, header...),
+		body,
+	)
 
 	if err != nil {
 		return nil, err
