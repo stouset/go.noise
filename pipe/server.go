@@ -22,7 +22,7 @@ func (h *serverHandshake) Eph(eph []byte) {
 	h.context.Init(ciphersuite.PublicKey(eph))
 }
 
-func (h *serverHandshake) Syn(data []byte, padLen uint32) (syn []byte, err error) {
+func (h *serverHandshake) Syn(data []byte, padLen uint32) (syn []byte) {
 	return h.context.Shut(data, 1, padLen)
 }
 

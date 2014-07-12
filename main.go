@@ -23,7 +23,7 @@ func main() {
 	var syn1, syn2, ack1, ack2 []byte
 	var err error
 
-	syn1, err = serverHandshake.Syn([]byte("hoy!"), 0)
+	syn1 = serverHandshake.Syn([]byte("hoy!"), 0)
 
 	if err != nil {
 		goto err
@@ -38,7 +38,7 @@ func main() {
 	fmt.Printf("Syn: %x\n", syn1)
 	fmt.Printf("Syn Contents: %s\n", syn2)
 
-	ack1, err = clientHandshake.Ack([]byte("hoy hoy!"), 0)
+	ack1 = clientHandshake.Ack([]byte("hoy hoy!"), 0)
 
 	if err != nil {
 		goto err

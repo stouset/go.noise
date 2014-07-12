@@ -26,7 +26,7 @@ func (h *clientHandshake) Syn(syn []byte) (data []byte, err error) {
 	return h.context.Open(syn, 1)
 }
 
-func (h *clientHandshake) Ack(data []byte, padLen uint32) (ack []byte, err error) {
+func (h *clientHandshake) Ack(data []byte, padLen uint32) (ack []byte) {
 	return h.context.Shut(data, 2, padLen)
 }
 

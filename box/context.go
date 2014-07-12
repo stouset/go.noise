@@ -2,8 +2,6 @@ package box
 
 import "github.com/stouset/go.noise/ciphersuite"
 
-import "errors"
-
 type Context struct {
 	suite ciphersuite.Ciphersuite
 
@@ -12,8 +10,7 @@ type Context struct {
 	peerEphemeralKey *ciphersuite.PublicKey
 	peerKey          *ciphersuite.PublicKey
 
-	cv     []byte
-	kdfNum int8
+	cv []byte
 }
 
 func NewContext(
@@ -40,7 +37,6 @@ func NewContext(
 		selfEphemeralKey: selfEphemeralKey,
 		peerKey:          new(ciphersuite.PublicKey),
 		peerEphemeralKey: new(ciphersuite.PublicKey),
-		kdfNum:           counterStart * 2,
 	}
 }
 
@@ -60,11 +56,7 @@ func (c *Context) Init(peerEphemeralKey ciphersuite.PublicKey) {
 	*c.peerEphemeralKey = peerEphemeralKey
 }
 
-func (c *Context) Shut(data []byte, counter int8, padLen uint32) (box []byte, err error) {
-	if c.kdfNum > counter*2 {
-		return nil, errors.New("box.Shut: counter is out of sync")
-	}
-
+func (c *Context) Shut(data []byte, kdfId int8, padLen uint32) (box []byte) {
 	return shutBox(
 		c.suite,
 		c.selfEphemeralKey,
@@ -72,17 +64,13 @@ func (c *Context) Shut(data []byte, counter int8, padLen uint32) (box []byte, er
 		c.peerEphemeralKey,
 		c.peerKey,
 		&c.cv,
-		&c.kdfNum,
+		kdfId*2,
 		padLen,
 		data,
-	), nil
+	)
 }
 
-func (c *Context) Open(box []byte, counter int8) (data []byte, err error) {
-	if c.kdfNum != counter*2 {
-		return nil, errors.New("box.Open: counter is out of sync")
-	}
-
+func (c *Context) Open(box []byte, kdfId int8) (data []byte, err error) {
 	return openBox(
 		c.suite,
 		c.selfEphemeralKey,
@@ -90,7 +78,7 @@ func (c *Context) Open(box []byte, counter int8) (data []byte, err error) {
 		c.peerEphemeralKey,
 		c.peerKey,
 		&c.cv,
-		&c.kdfNum,
+		kdfId*2,
 		box,
 	)
 }

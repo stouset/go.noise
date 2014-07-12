@@ -15,12 +15,12 @@ func deriveBoxKey(
 	suite ciphersuite.Ciphersuite,
 	dhKey ciphersuite.SymmetricKey,
 	cv *[]byte,
-	kdfNum *int8,
+	kdfNum int8,
 ) (
 	cc []byte,
 ) {
 	name := suite.Name()
-	info := append(name[:], byte(*kdfNum))
+	info := append(name[:], byte(kdfNum))
 
 	key := kdf.Derive(
 		dhKey,
@@ -29,7 +29,6 @@ func deriveBoxKey(
 		suite.CVLen()+suite.CCLen(),
 	)
 
-	*kdfNum += 1
 	*cv = key[:suite.CVLen()]
 	cc = key[suite.CVLen():]
 
@@ -43,7 +42,7 @@ func shutBox(
 	peerEphemeralKey *ciphersuite.PublicKey,
 	peerKey *ciphersuite.PublicKey,
 	cv *[]byte,
-	kdfNum *int8,
+	kdfNum int8,
 	padLen uint32,
 	data []byte,
 ) (
@@ -53,7 +52,7 @@ func shutBox(
 	cc1 := deriveBoxKey(suite, dh1, cv, kdfNum)
 
 	dh2 := suite.DH(selfKey.Private, *peerEphemeralKey)
-	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum)
+	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum+1)
 
 	header := shutBoxHeader(suite, cc1, selfEphemeralKey.Public, selfKey.Public)
 	body := shutBoxBody(suite, cc2, header, data, padLen)
@@ -114,7 +113,7 @@ func openBox(
 	peerEphemeralKey *ciphersuite.PublicKey,
 	peerKey *ciphersuite.PublicKey,
 	cv *[]byte,
-	kdfNum *int8,
+	kdfNum int8,
 	box []byte,
 ) (
 	data []byte,
@@ -134,7 +133,7 @@ func openBox(
 	}
 
 	dh2 := suite.DH(selfEphemeralKey.Private, *peerKey)
-	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum)
+	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum+1)
 
 	data, err = openBoxBody(suite, cc2, body, header)
 
