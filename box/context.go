@@ -37,6 +37,7 @@ func NewContext(
 		selfEphemeralKey: selfEphemeralKey,
 		peerKey:          new(ciphersuite.PublicKey),
 		peerEphemeralKey: new(ciphersuite.PublicKey),
+		cv:               make([]byte, suite.CVLen()),
 	}
 }
 
