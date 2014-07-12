@@ -10,7 +10,6 @@ import "github.com/stouset/go.noise/ciphersuite"
 import "github.com/stouset/go.noise/kdf"
 
 import "encoding/binary"
-import "fmt"
 
 func deriveBoxKey(
 	suite ciphersuite.Ciphersuite,
@@ -55,9 +54,6 @@ func shutBox(
 
 	dh2 := suite.DH(selfKey.Private, *peerEphemeralKey)
 	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum)
-
-	fmt.Println(dh1, cc1)
-	fmt.Println(dh2, cc2)
 
 	header := shutBoxHeader(suite, cc1, selfEphemeralKey.Public, selfKey.Public)
 	body := shutBoxBody(suite, cc2, header, data, padLen)
@@ -131,8 +127,6 @@ func openBox(
 	dh1 := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
 	cc1 := deriveBoxKey(suite, dh1, cv, kdfNum)
 
-	fmt.Println(dh1, cc1)
-
 	*peerKey, err = openBoxHeader(suite, cc1, *peerEphemeralKey, header)
 
 	if err != nil {
@@ -141,8 +135,6 @@ func openBox(
 
 	dh2 := suite.DH(selfEphemeralKey.Private, *peerKey)
 	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum)
-
-	fmt.Println(dh2, cc2)
 
 	data, err = openBoxBody(suite, cc2, body, header)
 
