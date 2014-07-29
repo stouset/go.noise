@@ -6,10 +6,10 @@ package ciphersuite
 // #include <sodium/crypto_scalarmult_curve25519.h>
 // #include <sodium/crypto_stream_chacha20.h>
 // #include <sodium/randombytes.h>
+// #include <sodium/utils.h>
 import "C"
 import "unsafe"
 
-import "bytes"
 import "encoding/binary"
 import "errors"
 
@@ -116,7 +116,7 @@ func (n *noise255) Decrypt(
 	mac := ciphertext[len(ciphertext)-n.macLen:]
 	ciphertext = ciphertext[:len(ciphertext)-n.macLen]
 
-	if !bytes.Equal(mac, n.mac(macKey, authtext, ciphertext)) {
+	if !equal(mac, n.mac(macKey, authtext, ciphertext)) {
 		return nil, errors.New("noise255: ciphertext MAC indicates tampering")
 	}
 
@@ -183,6 +183,21 @@ func (n *noise255) mac(
 	C.crypto_onetimeauth_poly1305(macPtr, inPtr, C.ulonglong(inLen), keyPtr)
 
 	return
+}
+
+func equal(
+	b1 []byte,
+	b2 []byte,
+) bool {
+	b1Ptr := unsafe.Pointer(&b1[0])
+	b2Ptr := unsafe.Pointer(&b2[0])
+	b1Len := C.size_t(len(b1))
+
+	if len(b1) != len(b2) {
+		return false
+	}
+
+	return int(C.sodium_memcmp(b1Ptr, b2Ptr, b1Len)) == 0
 }
 
 func pad16len(in []byte) int {
