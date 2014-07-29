@@ -102,7 +102,7 @@ func shutBoxBody(
 	plaintext := make([]byte, len(data)+int(padLen)+4)
 	copy(plaintext, data)
 	copy(plaintext[len(data):], random)
-	binary.BigEndian.PutUint32(plaintext[len(data)+len(random):], padLen)
+	binary.LittleEndian.PutUint32(plaintext[len(data)+len(random):], padLen)
 
 	return suite.Encrypt(
 		cc,
@@ -181,7 +181,7 @@ func openBoxBody(
 		return nil, err
 	}
 
-	padLen := binary.BigEndian.Uint32(plaintext[len(plaintext)-4:])
+	padLen := binary.LittleEndian.Uint32(plaintext[len(plaintext)-4:])
 
 	return plaintext[:len(plaintext)-int(padLen)-4], nil
 }

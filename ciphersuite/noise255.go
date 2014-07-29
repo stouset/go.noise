@@ -86,11 +86,11 @@ func (n *noise255) Encrypt(
 	key := cc[:n.keyLen]
 	iv := cc[n.keyLen:]
 
-	keystream := n.encrypt(key, iv, make([]byte, 128), 0)
-	ciphertext = n.encrypt(key, iv, plaintext, 2)
+	keystream := n.encrypt(key, iv, make([]byte, 64), 0)
+	ciphertext = n.encrypt(key, iv, plaintext, 1)
 
 	macKey := keystream[:n.macKeyLen]
-	copy(cc, keystream[64:64+n.CCLen()])
+	copy(cc, n.encrypt(key, flip(iv), make([]byte, 64), 1)[:n.CCLen()])
 
 	mac := n.mac(macKey, authtext, ciphertext)
 
@@ -110,7 +110,7 @@ func (n *noise255) Decrypt(
 	key := cc[:n.keyLen]
 	iv := cc[n.keyLen:]
 
-	keystream := n.encrypt(key, iv, make([]byte, 128), 0)
+	keystream := n.encrypt(key, iv, make([]byte, 64), 0)
 	macKey := keystream[:n.macKeyLen]
 
 	mac := ciphertext[len(ciphertext)-n.macLen:]
@@ -120,9 +120,9 @@ func (n *noise255) Decrypt(
 		return nil, errors.New("noise255: ciphertext MAC indicates tampering")
 	}
 
-	plaintext = n.encrypt(key, iv, ciphertext, 2)
+	plaintext = n.encrypt(key, iv, ciphertext, 1)
 
-	copy(cc, keystream[64:64+n.CCLen()])
+	copy(cc, n.encrypt(key, flip(iv), make([]byte, 64), 1)[:n.CCLen()])
 
 	return
 }
@@ -173,8 +173,8 @@ func (n *noise255) mac(
 
 	copy(in[authtextOffset:], authtext)
 	copy(in[ciphertextOffset:], ciphertext)
-	binary.BigEndian.PutUint64(in[authLenOffset:], uint64(len(authtext)))
-	binary.BigEndian.PutUint64(in[cipherLenOffset:], uint64(len(ciphertext)))
+	binary.LittleEndian.PutUint64(in[authLenOffset:], uint64(len(authtext)))
+	binary.LittleEndian.PutUint64(in[cipherLenOffset:], uint64(len(ciphertext)))
 
 	macPtr := (*C.uchar)(unsafe.Pointer(&mac[0]))
 	keyPtr := (*C.uchar)(unsafe.Pointer(&key[0]))
@@ -186,5 +186,16 @@ func (n *noise255) mac(
 }
 
 func pad16len(in []byte) int {
-	return len(in) + 16 - (len(in) % 16)
+	return len(in) + (16 - (len(in) % 16) % 16)
+}
+
+func flip(in []byte) (out []byte) {
+	n  := len(in)
+	out = make([]byte, n)
+
+	for i := 0; i < n; i++ {
+		out[i] = ^in[i]
+	}
+
+	return
 }
