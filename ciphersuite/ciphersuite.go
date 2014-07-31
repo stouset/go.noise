@@ -31,6 +31,10 @@ type Ciphersuite interface {
 	NewKeypair() Keypair
 	NewChain() ChainVariable
 
+	// TODO: are these still necessary?
+	DHLen() int
+	MACLen() int
+
 	DH(
 		private PrivateKey,
 		public PublicKey,
@@ -70,6 +74,9 @@ type ciphersuite struct {
 func (c *ciphersuite) NewChain() ChainVariable {
 	return make([]byte, c.cvLen)
 }
+
+func (c *ciphersuite) DHLen() int  { return c.dhLen }
+func (c *ciphersuite) MACLen() int { return c.macLen }
 
 func (c *ciphersuite) DeriveCVCC(
 	cv ChainVariable,

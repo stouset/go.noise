@@ -7,33 +7,8 @@ import "C"
 import "unsafe"
 
 import "github.com/stouset/go.noise/ciphersuite"
-import "github.com/stouset/go.noise/kdf"
 
 import "encoding/binary"
-
-func deriveBoxKey(
-	suite ciphersuite.Ciphersuite,
-	dhKey ciphersuite.SymmetricKey,
-	cv *[]byte,
-	kdfNum int8,
-) (
-	cc []byte,
-) {
-	name := suite.Name()
-	info := append(name[:], byte(kdfNum))
-
-	key := kdf.Derive(
-		dhKey,
-		*cv,
-		info,
-		suite.CVLen()+suite.CCLen(),
-	)
-
-	*cv = key[:suite.CVLen()]
-	cc = key[suite.CVLen():]
-
-	return
-}
 
 func shutBox(
 	suite ciphersuite.Ciphersuite,
@@ -41,18 +16,20 @@ func shutBox(
 	selfKey *ciphersuite.Keypair,
 	peerEphemeralKey *ciphersuite.PublicKey,
 	peerKey *ciphersuite.PublicKey,
-	cv *[]byte,
+	cv *ciphersuite.ChainVariable,
 	kdfNum int8,
 	padLen uint32,
 	data []byte,
 ) (
 	box []byte,
 ) {
+	var cc1, cc2 ciphersuite.CipherContext
+
 	dh1 := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
-	cc1 := deriveBoxKey(suite, dh1, cv, kdfNum)
+	*cv, cc1 = suite.DeriveCVCC(*cv, dh1, kdfNum)
 
 	dh2 := suite.DH(selfKey.Private, *peerEphemeralKey)
-	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum+1)
+	*cv, cc2 = suite.DeriveCVCC(*cv, dh2, kdfNum+1)
 
 	header := shutBoxHeader(suite, cc1, selfEphemeralKey.Public, selfKey.Public)
 	body := shutBoxBody(suite, cc2, selfEphemeralKey.Public, header, data, padLen)
@@ -77,7 +54,7 @@ func shutBoxHeader(
 ) (
 	header []byte,
 ) {
-	return suite.Encrypt(cc, selfEphemeralPublicKey, selfPublicKey)
+	return suite.Encrypt(cc, selfPublicKey, selfEphemeralPublicKey)
 }
 
 func shutBoxBody(
@@ -106,8 +83,8 @@ func shutBoxBody(
 
 	return suite.Encrypt(
 		cc,
-		append(selfEphemeralPublicKey, header...),
 		plaintext,
+		append(selfEphemeralPublicKey, header...),
 	)
 }
 
@@ -117,19 +94,21 @@ func openBox(
 	selfKey *ciphersuite.Keypair,
 	peerEphemeralKey *ciphersuite.PublicKey,
 	peerKey *ciphersuite.PublicKey,
-	cv *[]byte,
+	cv *ciphersuite.ChainVariable,
 	kdfNum int8,
 	box []byte,
 ) (
 	data []byte,
 	err error,
 ) {
+	var cc1, cc2 ciphersuite.CipherContext
+
 	*peerEphemeralKey = box[:suite.DHLen()]
 	header := box[suite.DHLen() : suite.DHLen()+suite.DHLen()+suite.MACLen()]
 	body := box[suite.DHLen()+suite.DHLen()+suite.MACLen():]
 
 	dh1 := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
-	cc1 := deriveBoxKey(suite, dh1, cv, kdfNum)
+	*cv, cc1 = suite.DeriveCVCC(*cv, dh1, kdfNum)
 
 	*peerKey, err = openBoxHeader(suite, cc1, *peerEphemeralKey, header)
 
@@ -138,7 +117,7 @@ func openBox(
 	}
 
 	dh2 := suite.DH(selfEphemeralKey.Private, *peerKey)
-	cc2 := deriveBoxKey(suite, dh2, cv, kdfNum+1)
+	*cv, cc2 = suite.DeriveCVCC(*cv, dh2, kdfNum+1)
 
 	data, err = openBoxBody(suite, cc2, peerEphemeralKey, header, body)
 
@@ -158,7 +137,7 @@ func openBoxHeader(
 	peerKey ciphersuite.PublicKey,
 	err error,
 ) {
-	return suite.Decrypt(cc, peerEphemeralKey, header)
+	return suite.Decrypt(cc, header, peerEphemeralKey)
 }
 
 func openBoxBody(
@@ -173,8 +152,8 @@ func openBoxBody(
 ) {
 	plaintext, err := suite.Decrypt(
 		cc,
-		append(*peerEphemeralKey, header...),
 		body,
+		append(*peerEphemeralKey, header...),
 	)
 
 	if err != nil {

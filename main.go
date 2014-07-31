@@ -12,8 +12,8 @@ func main() {
 	serverKey := suite.NewKeypair()
 	clientKey := suite.NewKeypair()
 
-	clientHandshake := pipe.NewClientHandshake(suite, clientKey)
-	serverHandshake := pipe.NewServerHandshake(suite, serverKey)
+	clientHandshake := pipe.NewClientHandshake(suite, &clientKey)
+	serverHandshake := pipe.NewServerHandshake(suite, &serverKey)
 	defer clientHandshake.Terminate()
 	defer serverHandshake.Terminate()
 

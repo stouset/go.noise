@@ -10,7 +10,7 @@ type Context struct {
 	peerEphemeralKey *ciphersuite.PublicKey
 	peerKey          *ciphersuite.PublicKey
 
-	cv []byte
+	cv ciphersuite.ChainVariable
 }
 
 func NewContext(
@@ -23,12 +23,14 @@ func NewContext(
 	var selfEphemeralKey *ciphersuite.Keypair
 
 	if selfKey == nil {
-		selfKey = suite.NewKeypair()
+		selfKey = new(ciphersuite.Keypair)
+		*selfKey = suite.NewKeypair()
 		selfEphemeralKey = selfKey
 	}
 
 	if selfEphemeralKey == nil {
-		selfEphemeralKey = suite.NewKeypair()
+		selfEphemeralKey = new(ciphersuite.Keypair)
+		*selfEphemeralKey = suite.NewKeypair()
 	}
 
 	return &Context{
@@ -37,7 +39,7 @@ func NewContext(
 		selfEphemeralKey: selfEphemeralKey,
 		peerKey:          new(ciphersuite.PublicKey),
 		peerEphemeralKey: new(ciphersuite.PublicKey),
-		cv:               make([]byte, suite.CVLen()),
+		cv:               suite.NewChain(),
 	}
 }
 
