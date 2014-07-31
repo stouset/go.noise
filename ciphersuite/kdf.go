@@ -21,7 +21,7 @@ func kdf(
 		c      = byte(0)
 
 		// preallocate memory for the entire output
-		out []byte = make([]byte, blocks*hashLen)
+		out = make([]byte, blocks*hashLen)
 
 		// offsets for the different fields that comprise the
 		// message that gets hashed
