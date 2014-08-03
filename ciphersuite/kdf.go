@@ -1,27 +1,36 @@
 package ciphersuite
 
 // #cgo pkg-config: libsodium
+// #include <string.h>
 // #include <sodium/crypto_auth_hmacsha512.h>
 import "C"
+
+import (
+	"github.com/stouset/go.secrets"
+	"unsafe"
+)
 
 // Derives a key from a secret, a chaining variable (as extra), and an
 // info parameter used to ensure uniqueness of the inputs as a whole.
 func kdf(
-	secret []byte,
-	extra []byte,
+	secret secrets.Secret,
+	extra secrets.Secret,
 	info []byte,
-	outLen int,
-) []byte {
-	const hashLen = 64
+	keyLen int,
+) (
+	key *secrets.Secret,
+	err error,
+) {
+	const (
+		hashLen   = 64
+		stateSize = int(unsafe.Sizeof(C.struct_crypto_auth_hmacsha512_state{}))
+	)
 
 	var (
 		// the number of blocks we need to generate, plus a
 		// counter to track our progress through them
-		blocks = byte((outLen + hashLen - 1) / hashLen)
-		c      = byte(0)
-
-		// preallocate memory for the entire output
-		out = make([]byte, blocks*hashLen)
+		blocks = (keyLen + hashLen - 1) / hashLen
+		c      = 0
 
 		// offsets for the different fields that comprise the
 		// message that gets hashed
@@ -29,46 +38,93 @@ func kdf(
 		cOffset = iOffset + len(info)
 		tOffset = cOffset + 1  // c is 1 byte long
 		eOffset = tOffset + 32 // we only use 32 bytes of t
-		mLength = eOffset + len(extra)
+		mLength = eOffset + extra.Len()
 
-		// C types for the secret and its size
-		sSize = byteArraySize(secret)
-		sPtr  = byteArrayPtr(secret)
-
-		// C types for the hashed message and its length
-		m    = make([]byte, mLength)
-		mLen = byteArrayLen(m)
-		mPtr = byteArrayPtr(m)
-
-		// C pointer to the current block being computed
-		t    = out
-		tPtr = byteArrayPtr(t)
-
-		// the HMAC internal state
-		state C.struct_crypto_auth_hmacsha512_state
+		state   *secrets.Secret
+		message *secrets.Secret
 	)
 
-	// copy the static components of m into place
-	copy(m[iOffset:], info)
-	copy(m[eOffset:], extra)
+	// allocate the HMAC internal state
+	state, err = secrets.NewSecret(stateSize)
 
-	// iteratively hash the message into each block of the output
+	if err != nil {
+		return nil, err
+	}
+
+	// allocate memory for the entire output
+	key, err = secrets.NewSecret(blocks * hashLen)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// allocate memory for the message to be hashed
+	message, err = secrets.NewSecret(mLength)
+
+	if err != nil {
+		return nil, err
+	}
+
+	state.ReadWrite()
+	defer state.Wipe()
+
+	key.ReadWrite()
+	defer key.Lock()
+
+	message.ReadWrite()
+	defer message.Wipe()
+
+	secret.Read()
+	defer secret.Lock()
+
+	extra.Read()
+	defer extra.Lock()
+
+	var (
+		statePtr = (*C.struct_crypto_auth_hmacsha512_state)(state.Pointer())
+
+		secretPtr  = (*C.uchar)(secret.Pointer())
+		secretSize = C.size_t(secret.Len())
+
+		extraSlice = extra.Slice()
+
+		messagePtr   = (*C.uchar)(message.Pointer())
+		messageLen   = C.ulonglong(message.Len())
+		messageSlice = message.Slice()
+
+		tAddr = uintptr(key.Pointer())
+
+		messageAddr  = uintptr(unsafe.Pointer(messagePtr))
+		messageAddrC = messageAddr + uintptr(cOffset)
+		messageAddrT = messageAddr + uintptr(tOffset)
+	)
+
+	// copy in the static components of the hashed message
+	copy(messageSlice[iOffset:], info)
+	copy(messageSlice[eOffset:], extraSlice)
+
+	// finished with extra, so explicitly re-lock it
+	extra.Lock()
+
 	for ; c < blocks; c++ {
-		copy(m[cOffset:], []byte{c})
+		C.memset(unsafe.Pointer(messageAddrC), C.int(c), 1)
 
-		C.crypto_auth_hmacsha512_init(&state, sPtr, sSize)
-		C.crypto_auth_hmacsha512_update(&state, mPtr, mLen)
-		C.crypto_auth_hmacsha512_final(&state, tPtr)
+		C.crypto_auth_hmacsha512_init(statePtr, secretPtr, secretSize)
+		C.crypto_auth_hmacsha512_update(statePtr, messagePtr, messageLen)
+		C.crypto_auth_hmacsha512_final(statePtr, (*C.uchar)(unsafe.Pointer(tAddr)))
 
-		// mix in some of the output from the previous block
-		// into the next iteration
-		copy(m[tOffset:], t[:32])
+		C.memcpy(unsafe.Pointer(messageAddrT), unsafe.Pointer(tAddr), 32)
 
-		// advance the pointer by one block
-		t = t[hashLen:]
-		tPtr = byteArrayPtr(t)
+		// advance the pointer into the key by one block
+		tAddr += uintptr(hashLen)
 	}
 
 	// trim output to match the requested length
-	return out[:outLen]
+	err = key.Trim(keyLen)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }

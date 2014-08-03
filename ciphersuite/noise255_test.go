@@ -1,9 +1,10 @@
 package ciphersuite
 
 import (
-	"bytes"
 	"reflect"
 	"testing"
+
+	"github.com/stouset/go.secrets"
 )
 
 func TestNoise255ImplementsCiphersuite(t *testing.T) {
@@ -18,12 +19,16 @@ func TestNoise255ImplementsCiphersuite(t *testing.T) {
 }
 
 func TestNewKeypairPrivateKeyLength(t *testing.T) {
-	pair := Noise255.NewKeypair()
+	pair, err := Noise255.NewKeypair()
 
-	if len(pair.Private) != curve25519_privKeyLen {
+	if err != nil {
+		t.Error("NewKeypair() = _, err; want nil")
+	}
+
+	if pair.Private.Len() != curve25519_privKeyLen {
 		t.Errorf(
-			"len(NewKeypair().Private) = %d; want %d",
-			len(pair.Private),
+			"NewKeypair().Private.Len() = %d; want %d",
+			pair.Private.Len(),
 			curve25519_privKeyLen,
 		)
 	}
@@ -31,12 +36,16 @@ func TestNewKeypairPrivateKeyLength(t *testing.T) {
 }
 
 func TestNewKeypairPublicKeyLength(t *testing.T) {
-	pair := Noise255.NewKeypair()
+	pair, err := Noise255.NewKeypair()
 
-	if len(pair.Public) != curve25519_pubKeyLen {
+	if err != nil {
+		t.Error("NewKeypair() = _, err; want nil")
+	}
+
+	if pair.Public.Len() != curve25519_pubKeyLen {
 		t.Errorf(
-			"len(NewKeypair().Public) = %d; want %d",
-			len(pair.Public),
+			"NewKeypair().Public.Len() = %d; want %d",
+			pair.Public.Len(),
 			curve25519_pubKeyLen,
 		)
 	}
@@ -44,12 +53,19 @@ func TestNewKeypairPublicKeyLength(t *testing.T) {
 }
 
 func TestNewKeypairPrivateKeyContents(t *testing.T) {
-	var (
-		pair  = Noise255.NewKeypair()
-		empty = make([]byte, curve25519_privKeyLen)
-	)
+	pair, err := Noise255.NewKeypair()
 
-	if bytes.Equal(pair.Private, empty) {
+	if err != nil {
+		t.Error("NewKeypair() = _, err; want nil")
+	}
+
+	empty, err := secrets.NewSecret(curve25519_privKeyLen)
+
+	if err != nil {
+		t.Errorf("NewSecret(%d) = _, err; want nil", curve25519_privKeyLen)
+	}
+
+	if pair.Private.Equal(*empty) {
 		t.Error(
 			"NewKeypair().Private = { 0x00 , ... }; want random",
 		)
@@ -57,12 +73,19 @@ func TestNewKeypairPrivateKeyContents(t *testing.T) {
 }
 
 func TestNewKeypairPublicKeyContents(t *testing.T) {
-	var (
-		pair  = Noise255.NewKeypair()
-		empty = make([]byte, curve25519_pubKeyLen)
-	)
+	pair, err := Noise255.NewKeypair()
 
-	if bytes.Equal(pair.Public, empty) {
+	if err != nil {
+		t.Error("NewKeypair() = _, err; want nil")
+	}
+
+	empty, err := secrets.NewSecret(curve25519_pubKeyLen)
+
+	if err != nil {
+		t.Errorf("NewSecret(%d) = _, err; want nil", curve25519_pubKeyLen)
+	}
+
+	if pair.Public.Equal(*empty) {
 		t.Error(
 			"NewKeypair().Public = { 0x00 , ... }; want random",
 		)
@@ -70,11 +93,21 @@ func TestNewKeypairPublicKeyContents(t *testing.T) {
 }
 
 func TestNewKeypairKeysDistinct(t *testing.T) {
-	pair := Noise255.NewKeypair()
+	pair1, err := Noise255.NewKeypair()
 
-	if bytes.Equal(pair.Private, pair.Public) {
+	if err != nil {
+		t.Error("NewKeypair() = _, err; want nil")
+	}
+
+	pair2, err := Noise255.NewKeypair()
+
+	if err != nil {
+		t.Error("NewKeypair() = _, err; want nil")
+	}
+
+	if pair1.Private.Equal(pair2.Private.Secret) {
 		t.Error(
-			"NewKeypair().Public = NewKeypair().private; want random",
+			"NewKeypair().Private = NewKeypair().private; want random",
 		)
 	}
 }
@@ -86,9 +119,15 @@ func TestDH(t *testing.T) {
 		expected = []byte("\x12\xa4\xe0\x6c\x7b\xf4\x45\x39\x53\xa1\xe1\x85\x5c\xe3\x4d\x5d\x33\x0f\x92\xb7\xf7\x19\x63\xaa\xf1\xcb\x59\x5c\x64\x69\xf9\x61")
 	)
 
-	dh := Noise255.DH(private, public)
+	var (
+		priv, _ = secrets.NewSecretFromBytes(private)
+		pub, _  = secrets.NewSecretFromBytes(public)
+		exp, _  = secrets.NewSecretFromBytes(expected)
+		dh, _   = Noise255.DH(PrivateKey{*priv}, PublicKey{*pub})
+		ret     = dh.Equal(*exp)
+	)
 
-	if !bytes.Equal(dh, expected) {
+	if !ret {
 		t.Errorf(
 			"DH(0x%x, 0x%x) = 0x%x; want 0x%x",
 			private,

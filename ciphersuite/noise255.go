@@ -1,5 +1,7 @@
 package ciphersuite
 
+import "github.com/stouset/go.secrets"
+
 var Noise255 = &noise255{
 	ciphersuite{
 		name:   [24]byte{'N', 'o', 'i', 's', 'e', '2', '5', '5'},
@@ -12,23 +14,71 @@ var Noise255 = &noise255{
 
 type noise255 struct{ ciphersuite }
 
-func (n *noise255) NewKeypair() Keypair {
-	var keypair = Keypair{
-		Private: make([]byte, curve25519_privKeyLen),
-		Public:  make([]byte, curve25519_pubKeyLen),
+func (n *noise255) NewKeypair() (*Keypair, error) {
+	var (
+		privKey *secrets.Secret
+		pubKey  *secrets.Secret
+		err     error
+	)
+
+	privKey, err = secrets.NewSecret(curve25519_privKeyLen)
+
+	if err != nil {
+		return nil, err
 	}
 
-	noise_curve25519_keypair(keypair.Private, keypair.Public)
+	pubKey, err = secrets.NewSecret(curve25519_pubKeyLen)
 
-	return keypair
+	if err != nil {
+		return nil, err
+	}
+
+	privKey.Write()
+	defer privKey.Lock()
+
+	pubKey.Write()
+	defer pubKey.Lock()
+
+	noise_curve25519_keypair(
+		privKey.Slice(),
+		pubKey.Slice(),
+	)
+
+	return &Keypair{
+		Private: PrivateKey{*privKey},
+		Public:  PublicKey{*pubKey},
+	}, nil
 }
 
-func (n *noise255) DH(privKey PrivateKey, pubKey PublicKey) SymmetricKey {
-	dh := make([]byte, n.dhLen)
+func (n *noise255) DH(
+	privKey PrivateKey,
+	pubKey PublicKey,
+) (
+	*SymmetricKey,
+	error,
+) {
+	dh, err := secrets.NewSecret(curve25519_dhLen)
 
-	noise_curve25519_dh(dh, privKey, pubKey)
+	if err != nil {
+		return nil, err
+	}
 
-	return dh
+	privKey.Read()
+	defer privKey.Lock()
+
+	pubKey.Read()
+	defer pubKey.Lock()
+
+	dh.Write()
+	defer dh.Lock()
+
+	noise_curve25519_dh(
+		dh.Slice(),
+		privKey.Slice(),
+		pubKey.Slice(),
+	)
+
+	return &SymmetricKey{*dh}, err
 }
 
 func (n *noise255) Encrypt(
@@ -36,7 +86,14 @@ func (n *noise255) Encrypt(
 	plaintext []byte,
 	authtext []byte,
 ) []byte {
-	return noise_chacha20poly1305_encrypt(cc, plaintext, authtext)
+	cc.ReadWrite()
+	defer cc.Lock()
+
+	return noise_chacha20poly1305_encrypt(
+		cc.Slice(),
+		plaintext,
+		authtext,
+	)
 }
 
 func (n *noise255) Decrypt(
@@ -44,5 +101,12 @@ func (n *noise255) Decrypt(
 	ciphertext []byte,
 	authtext []byte,
 ) ([]byte, error) {
-	return noise_chacha20poly1305_decrypt(cc, ciphertext, authtext)
+	cc.ReadWrite()
+	defer cc.Lock()
+
+	return noise_chacha20poly1305_decrypt(
+		cc.Slice(),
+		ciphertext,
+		authtext,
+	)
 }

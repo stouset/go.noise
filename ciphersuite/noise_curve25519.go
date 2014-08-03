@@ -26,12 +26,12 @@ func noise_curve25519_keypair(
 }
 
 func noise_curve25519_dh(
-	dhKey []byte,
+	dh []byte,
 	privateKey []byte,
 	publicKey []byte,
 ) {
 	var (
-		dhPtr   = byteArrayPtr(dhKey)
+		dhPtr   = byteArrayPtr(dh)
 		privPtr = byteArrayPtr(privateKey)
 		pubPtr  = byteArrayPtr(publicKey)
 	)

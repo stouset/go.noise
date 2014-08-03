@@ -3,7 +3,6 @@ package ciphersuite
 // #cgo pkg-config: libsodium
 // #include <sodium/crypto_onetimeauth_poly1305.h>
 // #include <sodium/crypto_stream_chacha20.h>
-// #include <sodium/utils.h>
 import "C"
 
 import (
@@ -20,7 +19,7 @@ var (
 )
 
 func noise_chacha20poly1305_encrypt(
-	cc CipherContext,
+	cc []byte,
 	plaintext []byte,
 	authtext []byte,
 ) []byte {
@@ -44,7 +43,7 @@ func noise_chacha20poly1305_encrypt(
 }
 
 func noise_chacha20poly1305_decrypt(
-	cc CipherContext,
+	cc []byte,
 	ciphertext []byte,
 	authtext []byte,
 ) ([]byte, error) {
@@ -63,7 +62,7 @@ func noise_chacha20poly1305_decrypt(
 
 	chacha20(macKey, key, iv, zeroes, 0)
 
-	err = noise_poly1305_auth(mac, macKey, ciphertext, authtext)
+	err = noise_poly1305_hmac_verify(mac, macKey, ciphertext, authtext)
 
 	if err != nil {
 		return nil, err
@@ -77,7 +76,7 @@ func noise_chacha20poly1305_decrypt(
 }
 
 func noise_chacha20_rekey(
-	cc CipherContext,
+	cc []byte,
 ) {
 	var (
 		key    = cc[:chacha20_keyLen]
@@ -98,6 +97,34 @@ func noise_poly1305_hmac(
 	ciphertext []byte,
 	authtext []byte,
 ) {
+	poly1305(
+		dst,
+		macKey,
+		noise_poly1305_hmac_format(ciphertext, authtext),
+	)
+}
+
+func noise_poly1305_hmac_verify(
+	target []byte,
+	macKey []byte,
+	ciphertext []byte,
+	authtext []byte,
+) error {
+	if !poly1305_verify(
+		macKey,
+		target,
+		noise_poly1305_hmac_format(ciphertext, authtext),
+	) {
+		return errors.New("noise/ciphersuite: ciphertext MAC indicates tampering")
+	}
+
+	return nil
+}
+
+func noise_poly1305_hmac_format(
+	ciphertext []byte,
+	authtext []byte,
+) []byte {
 	var (
 		atPadLen = noise_pad16_len(authtext)
 		ctPadLen = noise_pad16_len(ciphertext)
@@ -107,33 +134,16 @@ func noise_poly1305_hmac(
 		atLenOffset = ctOffset + ctPadLen
 		ctLenOffset = atLenOffset + 8
 
-		in = make([]byte, atPadLen+ctPadLen+8+8)
+		out = make([]byte, atPadLen+ctPadLen+8+8)
 	)
 
-	copy(in[atOffset:], authtext)
-	copy(in[ctOffset:], ciphertext)
+	copy(out[atOffset:], authtext)
+	copy(out[ctOffset:], ciphertext)
 
-	binary.LittleEndian.PutUint64(in[atLenOffset:], uint64(len(authtext)))
-	binary.LittleEndian.PutUint64(in[ctLenOffset:], uint64(len(ciphertext)))
+	binary.LittleEndian.PutUint64(out[atLenOffset:], uint64(len(authtext)))
+	binary.LittleEndian.PutUint64(out[ctLenOffset:], uint64(len(ciphertext)))
 
-	poly1305(dst, macKey, in)
-}
-
-func noise_poly1305_auth(
-	target []byte,
-	macKey []byte,
-	ciphertext []byte,
-	authtext []byte,
-) error {
-	mac := make([]byte, poly1305_macLen)
-
-	noise_poly1305_hmac(mac, macKey, ciphertext, authtext)
-
-	if !byteArrayEqual(target, mac) {
-		return errors.New("noise/ciphersuite: ciphertext MAC indicates tampering")
-	}
-
-	return nil
+	return out
 }
 
 func noise_pad16_len(in []byte) int {
@@ -177,7 +187,34 @@ func poly1305(
 		inLen  = byteArrayLen(in)
 	)
 
-	C.crypto_onetimeauth_poly1305(dstPtr, inPtr, inLen, keyPtr)
+	C.crypto_onetimeauth_poly1305(
+		dstPtr,
+		inPtr,
+		inLen,
+		keyPtr,
+	)
+}
+
+func poly1305_verify(
+	key []byte,
+	target []byte,
+	in []byte,
+) bool {
+	var (
+		keyPtr    = byteArrayPtr(key)
+		targetPtr = byteArrayPtr(target)
+		inPtr     = byteArrayPtr(in)
+		inLen     = byteArrayLen(in)
+	)
+
+	ret := C.crypto_onetimeauth_poly1305_verify(
+		targetPtr,
+		inPtr,
+		inLen,
+		keyPtr,
+	)
+
+	return ret == 0
 }
 
 // Ensure that probed lengths match ones that are hardcoded in the

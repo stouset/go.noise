@@ -9,17 +9,17 @@ package ciphersuite
 // #include <sodium/core.h>
 import "C"
 
+import "github.com/stouset/go.secrets"
+
 type (
-	// TODO: ensure SymmetricKeys and PrivateKeys are always mlock'd
-	SymmetricKey []byte
-	PrivateKey   []byte
-	PublicKey    []byte
+	SymmetricKey struct{ secrets.Secret }
+	PrivateKey   struct{ secrets.Secret }
+	PublicKey    struct{ secrets.Secret }
 )
 
 type (
-	// TODO: ensure CipherContexts and ChainVariables are always mlock'd
-	CipherContext []byte
-	ChainVariable []byte
+	CipherContext struct{ secrets.Secret }
+	ChainVariable struct{ secrets.Secret }
 )
 
 type Keypair struct {
@@ -28,17 +28,17 @@ type Keypair struct {
 }
 
 type Ciphersuite interface {
-	NewKeypair() Keypair
-	NewChain() ChainVariable
+	NewKeypair() (*Keypair, error)
+	NewChainVariable() (*ChainVariable, error)
 
 	// TODO: are these still necessary?
-	DHLen() int
-	MACLen() int
+	// DHLen() int
+	// MACLen() int
 
 	DH(
 		private PrivateKey,
 		public PublicKey,
-	) SymmetricKey
+	) (*SymmetricKey, error)
 
 	Encrypt(
 		cc CipherContext,
@@ -56,11 +56,11 @@ type Ciphersuite interface {
 		cv ChainVariable,
 		key SymmetricKey,
 		kdfNum int8,
-	) (ChainVariable, CipherContext)
+	) (*ChainVariable, *CipherContext, error)
 
 	DeriveCCCC(
 		cv ChainVariable,
-	) (client CipherContext, server CipherContext)
+	) (client *CipherContext, server *CipherContext, err error)
 }
 
 type ciphersuite struct {
@@ -71,53 +71,91 @@ type ciphersuite struct {
 	cvLen  int
 }
 
-func (c *ciphersuite) NewChain() ChainVariable {
-	return make([]byte, c.cvLen)
+func (c *ciphersuite) NewChainVariable() (*ChainVariable, error) {
+	cv, err := secrets.NewSecret(c.cvLen)
+
+	return &ChainVariable{*cv}, err
 }
 
-func (c *ciphersuite) DHLen() int  { return c.dhLen }
-func (c *ciphersuite) MACLen() int { return c.macLen }
+// func (c *ciphersuite) DHLen() int  { return c.dhLen }
+// func (c *ciphersuite) MACLen() int { return c.macLen }
 
 func (c *ciphersuite) DeriveCVCC(
 	cv ChainVariable,
 	key SymmetricKey,
 	kdfNum int8,
 ) (
-	ChainVariable,
-	CipherContext,
+	*ChainVariable,
+	*CipherContext,
+	error,
 ) {
 	var (
-		secret = key
-		extra  = cv
+		secret = key.Secret
+		extra  = cv.Secret
 		info   = append(c.name[:], byte(kdfNum))
-		outLen = c.cvLen + c.ccLen
+		keyLen = c.cvLen + c.ccLen
 
-		pair = kdf(secret, extra, info, outLen)
+		newcv, err = kdf(secret, extra, info, keyLen)
+
+		newcc *secrets.Secret
 	)
 
-	return pair[:c.cvLen], pair[c.cvLen:]
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newcc, err = newcv.Split(c.cvLen)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &ChainVariable{*newcv}, &CipherContext{*newcc}, nil
 }
 
 func (c *ciphersuite) DeriveCCCC(
 	cv ChainVariable,
 ) (
-	client CipherContext,
-	server CipherContext,
+	client *CipherContext,
+	server *CipherContext,
+	err error,
 ) {
 	var (
-		secret = cv
-		extra  = make([]byte, c.cvLen)
-		info   = append(c.name[:], byte(6))
-		outLen = c.ccLen * 2
-
-		pair = kdf(secret, extra, info, outLen)
+		zeroes   *ChainVariable
+		clientcc *secrets.Secret
+		servercc *secrets.Secret
 	)
 
-	return pair[:c.ccLen], pair[c.ccLen:]
+	zeroes, err = c.NewChainVariable()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var (
+		secret = cv.Secret
+		extra  = zeroes.Secret
+		info   = append(c.name[:], byte(6))
+		keyLen = c.ccLen * 2
+	)
+
+	clientcc, err = kdf(secret, extra, info, keyLen)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	servercc, err = clientcc.Split(c.ccLen)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &CipherContext{*clientcc}, &CipherContext{*servercc}, nil
 }
 
 func init() {
-	if int(C.sodium_init()) != 0 {
+	if int(C.sodium_init()) == -1 {
 		panic("noise/ciphersuite: libsodium couldn't be initialized")
 	}
 }

@@ -25,10 +25,10 @@ func shutBox(
 ) {
 	var cc1, cc2 ciphersuite.CipherContext
 
-	dh1 := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
+	dh1, _ := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
 	*cv, cc1 = suite.DeriveCVCC(*cv, dh1, kdfNum)
 
-	dh2 := suite.DH(selfKey.Private, *peerEphemeralKey)
+	dh2, _ := suite.DH(selfKey.Private, *peerEphemeralKey)
 	*cv, cc2 = suite.DeriveCVCC(*cv, dh2, kdfNum+1)
 
 	header := shutBoxHeader(suite, cc1, selfEphemeralKey.Public, selfKey.Public)
@@ -107,7 +107,7 @@ func openBox(
 	header := box[suite.DHLen() : suite.DHLen()+suite.DHLen()+suite.MACLen()]
 	body := box[suite.DHLen()+suite.DHLen()+suite.MACLen():]
 
-	dh1 := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
+	dh1, _ := suite.DH(selfEphemeralKey.Private, *peerEphemeralKey)
 	*cv, cc1 = suite.DeriveCVCC(*cv, dh1, kdfNum)
 
 	*peerKey, err = openBoxHeader(suite, cc1, *peerEphemeralKey, header)
@@ -116,7 +116,7 @@ func openBox(
 		return nil, err
 	}
 
-	dh2 := suite.DH(selfEphemeralKey.Private, *peerKey)
+	dh2, _ := suite.DH(selfEphemeralKey.Private, *peerKey)
 	*cv, cc2 = suite.DeriveCVCC(*cv, dh2, kdfNum+1)
 
 	data, err = openBoxBody(suite, cc2, peerEphemeralKey, header, body)
